@@ -8,7 +8,7 @@ import json
 import firebase_admin
 from firebase_admin import credentials, auth, db, initialize_app
 #import pyrebase
-from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QMessageBox, QMainWindow
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QMessageBox, QMainWindow, QInputDialog
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient
 
@@ -79,6 +79,14 @@ class LoginWindow(QWidget):
             "QPushButton { background-color: #4682B4; color: white; padding: 10px 20px; font-size: 20px; margin-left: 30px; margin-right: 30px; font-weight: bold;}")
         layout.addWidget(self.register_button)
 
+        # Reset Password Button
+        self.reset_password_button = QPushButton("RESET PASSWORD")
+        self.reset_password_button.setFixedHeight(50)
+        self.reset_password_button.clicked.connect(self.reset_password)
+        self.reset_password_button.setStyleSheet(
+            "QPushButton { background-color: #F53226; color: white; padding: 10px 20px; font-size: 20px; margin-left: 30px; margin-right: 30px; font-weight: bold;}")
+        layout.addWidget(self.reset_password_button)
+
         self.setLayout(layout)
 
     # Draws and resizes the background color
@@ -92,6 +100,39 @@ class LoginWindow(QWidget):
         painter.drawRect(self.rect())  # Fill the entire widget with the gradient
 
         super().paintEvent(event)
+
+    #Allows users to reset their password
+    def reset_password(self):
+        # Prompt the user for their email
+        user_email, ok = QInputDialog.getText(self, "Password Reset", "Enter Your Email:")
+        if not ok or not user_email.strip():
+            return  # User canceled or entered invalid input
+
+        user_email = user_email.strip()
+
+        # Firebase API URL for sending password reset emails
+        reset_url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={firebase_api_key}"
+        payload_reset = {
+            "requestType": "PASSWORD_RESET",
+            "email": user_email
+        }
+
+        try:
+            # Send the POST request to Firebase Authentication API
+            response = requests.post(reset_url, json=payload_reset)
+
+            if response.status_code == 200:
+                QMessageBox.information(self, "Password Reset", "A password reset email has been sent.")
+            else:
+                error_data = response.json()
+                error_message = error_data.get('error', {}).get('message', 'Unknown error')
+
+                if error_message == "EMAIL_NOT_FOUND":
+                    QMessageBox.warning(self, "Error", "Email not found. Please register first.")
+                else:
+                    QMessageBox.warning(self, "Error", f"Failed to send reset email: {error_message}")
+        except requests.exceptions.RequestException as e:
+            QMessageBox.warning(self, "Error", f"An error occurred: {str(e)}")
 
     def login(self):
         email = self.email_input.text()
@@ -194,4 +235,5 @@ def main():
 # Optional: make this the default entry point if running as a script
 if __name__ == "__main__":
     main()
+
 
