@@ -43,9 +43,32 @@ from PySide6.QtCore import (
 from WhiteboardApplication.UI.board import Ui_MainWindow
 from WhiteboardApplication.text_box import TextBox
 from WhiteboardApplication.new_notebook import NewNotebook
+
 from WhiteboardApplication.board_scene import BoardScene
 
 from WhiteboardApplication.resize_handle_image import ResizablePixmapItem
+
+from WhiteboardApplication.video_player import MediaPlayer
+from WhiteboardApplication.Collab_Functionality.client import Client
+
+
+    # def shapes_menu(self):
+    #     shapes_menu = QMenu()
+    #     ellipse_action = shapes_menu.addAction("Ellipse")
+    #     rectangle_action = shapes_menu.addAction("Rectangle")
+    #
+    #     # Execute the menu and capture the action
+    #     action = shapes_menu.exec(QCursor.pos())
+    #
+    #     if action == ellipse_action:
+    #         self.shape_selected = "ellipse"
+    #     elif action == rectangle_action:
+    #         self.shape_selected = "rectangle"
+    #
+    # def get_shape_selected(self):
+    #     return self.shape_selected
+
+
 
 class MainWindow(QMainWindow, Ui_MainWindow):
 
@@ -78,6 +101,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         #sharon helped me out by showing this below
         self.tb_actionText.triggered.connect(self.create_text_box)
+
         self.tb_actionEraser.triggered.connect(self.button_clicked)
         self.tb_actionPen.triggered.connect(self.button_clicked)
 
@@ -91,6 +115,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.tb_actionEraser.setMenu(menu)
 
         self.eraser_color = QColor("#F3F3F3")
+
         self.current_color = QColor("#000000")
 
         ############################################################################################################
@@ -109,6 +134,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Image
         self.tb_actionImages.triggered.connect(self.upload_image)
         ###########################################################################################################
+
         self.redo_list = []
 
         self.new_tab()
@@ -245,6 +271,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def redo(self):
         self.tabWidget.currentWidget().findChild(QGraphicsView, 'gv_Canvas').scene().redo()
 
+    # def shapes(self):
+    #     self.tabWidget.currentWidget().findChild(QGraphicsView, 'gv_Canvas').scene().shapes_menu()
+
     def clear_canvas(self):
         self.tabWidget.currentWidget().findChild(QGraphicsView, 'gv_Canvas').scene().clear()
 
@@ -258,7 +287,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.tabWidget.currentWidget().findChild(QGraphicsView, 'gv_Canvas').scene().set_active_tool("eraser")
         self.tb_actionPen.setChecked(False)  # Ensure pen is not active
         self.tb_actionCursor.setChecked(False)
-
 
     def penEraser_action(self):
         print("Pen Eraser action")
@@ -514,7 +542,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return transform
 
     def deserialize_text_item(self, data):
-        from text_box import TextBox
         text_item = TextBox()
         text_item.setFont(self.deserialize_font(data['font']))
         text_item.setDefaultTextColor(self.deserialize_color(data['color']))
@@ -558,7 +585,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.scene = BoardScene()
         NewNotebook.get_canvas(NewNotebook).setScene(self.scene)
         NewNotebook.get_canvas(NewNotebook).setRenderHint(QPainter.RenderHint.Antialiasing, True)
-
+        
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
