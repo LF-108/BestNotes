@@ -70,8 +70,10 @@ Once that is completed, do the following:
 - Once this is done, navigate to terminal by clicking the magnifying glass on the right side of the menu bar, type "terminal" and enter, which will open terminal.
 - Now you need to navigate to the project. You can do this using the command, "cd Documents", followed by "cd 01-BestNotes" or cd and the name you chose for the cloned repository.
 - Once you have navigated to BestNotes, type "source venv/bin/activate" to activate the virtual environment. It should say (venv) (base) <rest of command line>
-- Now type the command "pip3 install pyside6" and "pip install python-vlc" after.
-- Once the download has completed, return to IntelliJ and hit the play button to run main.py and use the application.
+- Now type the command "pip3 install pyside6"
+- Also type in the command "pip install python -vlc"
+- Once the download has completed, return to IntelliJ and hit the play button to run login.py and use the application.
+- Enter a username and password and click the blue register button. Now that you are registered as a user, you may use the whiteboard and login with these credentials anytime.
 
 Credits: Contributing on the code from [WhiteBoard](https://github.com/Shabbar10/PySide-Whiteboard)
 

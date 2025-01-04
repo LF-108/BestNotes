@@ -2,10 +2,13 @@ from PySide6.QtWidgets import (
     QGraphicsTextItem, QGraphicsRectItem, QGraphicsItem, QColorDialog, QFontDialog, QMenu, QGraphicsItemGroup, QGraphicsEllipseItem
 )
 from PySide6.QtGui import QFont, QPen, QColor, QBrush
-from PySide6.QtCore import Qt, QPointF, QRectF
+from PySide6.QtCore import Qt, QPointF, QRectF, Signal
 from WhiteboardApplication.resize_handles import ResizeHandle
 
 class TextBox(QGraphicsTextItem):
+    contentChanged = Signal()
+    moved = Signal()
+
     def __init__(self):
         super().__init__()
 
@@ -21,6 +24,7 @@ class TextBox(QGraphicsTextItem):
 
         # Allow text editing within the box
         self.setTextInteractionFlags(Qt.TextEditorInteraction)
+        self.document().contentsChanged.connect(self.contentChanged.emit)
 
         # Create background rectangle
         self.background = QGraphicsRectItem(self)
@@ -30,10 +34,10 @@ class TextBox(QGraphicsTextItem):
 
         # Define color mapping for resize handles
         handle_colors = {
-            'topleft': QColor(255, 0, 0),     # Red doesn't work
-            'top': QColor(0, 255, 0),         # Green doesn't work
+            'topleft': QColor(255, 0, 0),     # Red
+            'top': QColor(0, 255, 0),         # Green
             'topright': QColor(0, 0, 255),    # Blue
-            'right': QColor(255, 255, 0),     # Yellow doesn't work
+            'right': QColor(255, 255, 0),     # Yellow
             'bottomright': QColor(255, 0, 255), # Magenta
             'bottom': QColor(0, 255, 255),    # Cyan
             'bottomleft': QColor(255, 128, 0), # Orange
@@ -107,6 +111,7 @@ class TextBox(QGraphicsTextItem):
         if not self.drawing_disabled:
             # Process move or drawing events only if drawing is enabled
             super().mouseMoveEvent(event)
+            self.moved.emit()
         else:
             event.ignore()
 

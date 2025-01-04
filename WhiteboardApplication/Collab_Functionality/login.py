@@ -1,39 +1,38 @@
 import sys
-import sqlite3
+import os
 import bcrypt
-from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QMessageBox, QMainWindow
+import requests
+import boto3
+import json
+import json
+import firebase_admin
+from firebase_admin import credentials, auth, db, initialize_app
+#import pyrebase
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLineEdit, QPushButton, QMessageBox, QMainWindow, QInputDialog
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient
-from WhiteboardApplication.main import BoardScene, MainWindow
 
-# Sets up the sqlite database to hold user information
-def init_database():
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+from WhiteboardApplication.main import MainWindow
+from WhiteboardApplication.board_scene import BoardScene
 
-    # Creates table if it doesn't already exist
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    return conn
+#Load config files
+with open('../../config.json', 'r') as f:
+    config = json.load(f)
 
-# Encrypts password with bcrypt
-def encrypt_password(password):
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+#Pass the entire firebase_credentials.json file directly
+firebase_credentials_path = '../../firebase_credentials.json'
 
-# Verifies entered password against the stored hash
-def check_password(stored_hash, password):
-    try:
-        # Check if the entered password matches the stored hash
-        return bcrypt.checkpw(password.encode(), stored_hash.encode())
-    except Exception as e:
-        # General exception handler for unexpected errors
-        print(f"Error during password check: {e}")
-        return False
+firebase_api_key = config.get('FIREBASE_API_WEB_KEY')
+
+# Initialize Firebase app using the credentials
+cred = credentials.Certificate(firebase_credentials_path)
+print(cred)
+firebase_app = initialize_app(cred, {
+    'databaseURL': 'https://bestnotes-3e99f-default-rtdb.firebaseio.com/'
+})
+
+print("Made it here\n")
+#print(f"Contents are: {firebase_api_key}\n")
 
 # Login Window
 class LoginWindow(QWidget):
@@ -47,13 +46,13 @@ class LoginWindow(QWidget):
         # Layout setup
         layout = QVBoxLayout()
 
-        # Username Section
-        self.username_input = QLineEdit()
-        self.username_input.setFixedHeight(50)
-        self.username_input.setPlaceholderText("Username")
-        self.username_input.setFont(QFont("Arial", 12))
-        self.username_input.setStyleSheet("QLineEdit { padding: 10px 20px; margin-left: 30px; margin-right: 30px;}")
-        layout.addWidget(self.username_input)
+        # Email Section
+        self.email_input = QLineEdit()
+        self.email_input.setFixedHeight(50)
+        self.email_input.setPlaceholderText("Email")
+        self.email_input.setFont(QFont("Arial", 12))
+        self.email_input.setStyleSheet("QLineEdit { padding: 10px 20px; margin-left: 30px; margin-right: 30px;}")
+        layout.addWidget(self.email_input)
 
         # Password Section
         self.password_input = QLineEdit()
@@ -80,8 +79,15 @@ class LoginWindow(QWidget):
             "QPushButton { background-color: #4682B4; color: white; padding: 10px 20px; font-size: 20px; margin-left: 30px; margin-right: 30px; font-weight: bold;}")
         layout.addWidget(self.register_button)
 
+        # Reset Password Button
+        self.reset_password_button = QPushButton("RESET PASSWORD")
+        self.reset_password_button.setFixedHeight(50)
+        self.reset_password_button.clicked.connect(self.reset_password)
+        self.reset_password_button.setStyleSheet(
+            "QPushButton { background-color: #F53226; color: white; padding: 10px 20px; font-size: 20px; margin-left: 30px; margin-right: 30px; font-weight: bold;}")
+        layout.addWidget(self.reset_password_button)
+
         self.setLayout(layout)
-        self.db_conn = init_database()
 
     # Draws and resizes the background color
     def paintEvent(self, event):
@@ -95,44 +101,107 @@ class LoginWindow(QWidget):
 
         super().paintEvent(event)
 
-    # Method to log a user in
-    def login(self):
-        # Gets username and password, and sets cursor to search for the credentials
-        username = self.username_input.text()
-        password = self.password_input.text()
-        cursor = self.db_conn.cursor()
+    #Allows users to reset their password
+    def reset_password(self):
+        # Prompt the user for their email
+        user_email, ok = QInputDialog.getText(self, "Password Reset", "Enter Your Email:")
+        if not ok or not user_email.strip():
+            return  # User canceled or entered invalid input
 
-        # Checks if the credentials are there
-        cursor.execute("SELECT password FROM users WHERE username = ?", (username,))
-        result = cursor.fetchone()
+        user_email = user_email.strip()
 
-        # Checks if the decrypted password matches what the user entered
-        if result:
-            stored_password = result[0]
-            if check_password(stored_password, password):  # Correct call to check_password
-                QMessageBox.information(self, "Login Success", "Welcome!")
-                self.parent().show_whiteboard()  # Parent is the ApplicationWindow
-            else:
-                QMessageBox.warning(self, "Login Failed", "Invalid password.")
-        else:
-            QMessageBox.warning(self, "Login Failed", "User not found.")
+        # Firebase API URL for sending password reset emails
+        reset_url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={firebase_api_key}"
+        payload_reset = {
+            "requestType": "PASSWORD_RESET",
+            "email": user_email
+        }
 
-    # Allows a new user to register their credentials
-    def register(self):
-        # Accepts username and password, and sets the cursor in the database to add these credentials
-        username = self.username_input.text()
-        password = self.password_input.text()
-        cursor = self.db_conn.cursor()
-
-        # Inserts the new credentials and notifies user of status of registration
         try:
-            cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, encrypt_password(password)))
-            self.db_conn.commit()
+            # Send the POST request to Firebase Authentication API
+            response = requests.post(reset_url, json=payload_reset)
+
+            if response.status_code == 200:
+                QMessageBox.information(self, "Password Reset", "A password reset email has been sent.")
+            else:
+                error_data = response.json()
+                error_message = error_data.get('error', {}).get('message', 'Unknown error')
+
+                if error_message == "EMAIL_NOT_FOUND":
+                    QMessageBox.warning(self, "Error", "Email not found. Please register first.")
+                else:
+                    QMessageBox.warning(self, "Error", f"Failed to send reset email: {error_message}")
+        except requests.exceptions.RequestException as e:
+            QMessageBox.warning(self, "Error", f"An error occurred: {str(e)}")
+
+    def login(self):
+        email = self.email_input.text()
+        password = self.password_input.text()
+
+        print("Made it to url")
+        # Firebase API URL with the web API key
+        url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={firebase_api_key}"
+        print(f"Url says: {url}")
+        # Prepare the login request body
+        payload = {
+            "email": email,
+            "password": password,
+            "returnSecureToken": True  # This ensures the response includes the ID token
+        }
+
+        try:
+            # Send POST request to Firebase Authentication API
+            response = requests.post(url, json=payload)
+
+            # Check if login is successful
+            if response.status_code == 200:
+                # Get the ID token from the response
+                data = response.json()
+                id_token = data.get('idToken')
+
+                # Now verify the ID token using your existing function
+                if self.verify_id_token(id_token):
+                    QMessageBox.information(self, "Login Success", f"Welcome, {email}!")
+                    self.parent().show_whiteboard(email)  # Proceed to next window
+                else:
+                    QMessageBox.warning(self, "Login Failed", "Invalid token verification.")
+            else:
+                error_data = response.json()
+                error_message = error_data.get('error', {}).get('message', 'Unknown error')
+                QMessageBox.warning(self, "Login Failed", f"Authentication failed: {error_message}")
+        except requests.exceptions.RequestException as e:
+            QMessageBox.warning(self, "Login Failed", f"Error: {str(e)}")
+
+    def verify_id_token(self, id_token):
+        try:
+            # Call Firebase Admin SDK to verify the ID token
+            user_info = auth.verify_id_token(id_token)
+            print(f"User ID: {user_info['uid']}")
+            return True
+        except firebase_admin.auth.InvalidIdTokenError:
+            print("Invalid token")
+            return False
+
+    def register(self):
+        email = self.email_input.text()
+        password = self.password_input.text()
+
+        try:
+            # Create the user in Firebase Authentication
+            user = auth.create_user(
+                email=email,
+                password=password)
+
+            # Store additional user data in Firebase Realtime Database
+            db_ref = db.reference('users').child(user.uid)
+            db_ref.set({
+                'email': email
+            })
+
             QMessageBox.information(self, "Registration Success", "User registered successfully!")
 
-        # Stops if a user tries to register when they already have an account
-        except sqlite3.IntegrityError:
-            QMessageBox.warning(self, "Error", "Username already exists.")
+        except Exception as e:
+            QMessageBox.warning(self, "Registration Failed", f"Error: {str(e)}")
 
 # Application window, where the application is run from
 class ApplicationWindow(QMainWindow):
@@ -140,17 +209,22 @@ class ApplicationWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Collaborative Whiteboard")
 
+        self.user_email = None  # Store the email here
+
         # Creates the login window, board scene, and main window
         self.login_window = LoginWindow(self)
         self.board_scene = BoardScene()
         self.main_window = MainWindow()  # Import your MainWindow properly
-
         # Start with login window
         self.setCentralWidget(self.login_window)
 
-    def show_whiteboard(self):
+    def show_whiteboard(self, email):
         # Switches to whiteboard once login is done correctly
+        self.user_email= email
+        print("Email entered by user is (login): " + self.user_email)
+        self.main_window.set_user_email(self.user_email)
         self.setCentralWidget(self.main_window)
+
 
 def main():
     app = QApplication(sys.argv)
@@ -161,3 +235,5 @@ def main():
 # Optional: make this the default entry point if running as a script
 if __name__ == "__main__":
     main()
+
+

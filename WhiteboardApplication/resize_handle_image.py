@@ -118,3 +118,4 @@ class ResizablePixmapItem(QGraphicsPixmapItem):
 
         # Update handles after resizing
         self.update_handles()
+

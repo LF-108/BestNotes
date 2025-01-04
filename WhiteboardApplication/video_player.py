@@ -76,6 +76,7 @@ class MediaPlayer(QMainWindow):
 
         # Add actions to file menu
         open_action = QAction("Load Video", self)
+
         #commented out because it closes the entire Best Notes Application
         # close_action = QAction("Close App", self)
         file_menu.addAction(open_action)
